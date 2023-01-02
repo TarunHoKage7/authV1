@@ -1,43 +1,64 @@
 const express= require("express");
 const router = express.Router();
 const bcrypt = require("bcrypt");
+const createDB = require("../config/db");
+const User = require("../models/userModels");
 const {
     validatePassword,
     validateEmail,
-    validateName
-} = require("./validator")
+    validateName,
+} = require("../utils/validator");
 
-let users = {}
+createDB.sync().then(() => {
+    console.log("DB is running");
+});
+
+router.get("/", (req, res) => {
+    console.log(users);
+    res.status(200).send("Server is working well");
+});
 
 router.post("/signup", async (req,res) => {
     try{
         const{ name, email, password } = req.body;
-        console.log(name,email,password);
-        const userExist = users.hasOwnProperty(email);
+        console.log(name, email, password);
+        const userExist = await User.findOne({
+            email
+        });
         
         if(userExist){
-            res.send("user exists");
+            return res.status(403).send("User already exists");
         }
 
         if(!validateName(name)) {
-            res.send("Invalid name");
+            return res
+                .status(400)
+                .send("Invalid user name: name must be longer than two characters and must not include any special characters");
         }
 
         if(!validateName(email)) {
-            res.send("Invalid email");
+            return res.status(400).send("Invalid Email");
         }
 
         if(!validateName(password)) {
-            res.send("Invalid password");
+            return res
+                .status(400)
+                .send("Invalid password: name must be atleast 8 characters long and must include atleast: one uppercase letter, one lowercase letter, one digit, and one special character");
         }
 
-        const Epassword = await bcrypt.hash(password, 10);
+        const hashedPassword = await bcrypt.hash(password, 10);
 
-        users[email] = { name, password: Epassword };
+        users[email] = { name: name, password: hashedPassword };
 
-        res.send("Success");
-    }catch(e){
-        res.send(e);
+        const saveToDB = {
+            name, email, password: hashedPassword
+        }
+        const createdUser = await User.create(saveToDB);
+
+        res.status(201).send("User profile created");
+    }catch(err){
+        console.log(err);
+        return res.status(500).send(err.message);
     }
 });
 
